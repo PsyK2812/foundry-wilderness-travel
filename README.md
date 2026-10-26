@@ -14,5 +14,5 @@ A Foundry VTT module (v13/v14, dnd5e) for hexcrawl travel.
 Manifest URL:
 
 ```
-https://github.com/PsyK2812/foundry-wilderness-travel/releases/latest/download/module.json
+https://raw.githubusercontent.com/PsyK2812/foundry-wilderness-travel/main/module.json
 ```
