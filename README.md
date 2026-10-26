@@ -2,11 +2,10 @@
 
 A Foundry VTT module (v13/v14, dnd5e) for hexcrawl travel.
 
-- **Travel bar**: hexes travelled today, with the current day and a log of past days.
-- **Wilderness bar**: days spent without a safe haven. When the counter is full, characters gain one level of exhaustion and the counter resets.
-- **End Day prompt**: asks the GM whether the party rested at a safe haven.
-- **Exhaustion picker**: the GM chooses which player-owned actors gain exhaustion.
-- Both bars can be dragged anywhere on screen, and the GM can adjust all values.
+- **Hex clock**: hexes travelled today; resets every new in-game day.
+- **Wilderness clock**: days without a safe haven. When it fills, the GM picks who gains one level of exhaustion and it resets.
+- **New day prompt**: when the in-game date changes, the GM is asked whether the party rested at a safe haven.
+- GM: left-click +1, right-click -1. Everyone: drag to move.
 - Compatible with Rest Recovery's One D&D exhaustion (10 levels).
 
 ## Install
