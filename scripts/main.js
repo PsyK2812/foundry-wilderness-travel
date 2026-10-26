@@ -13,7 +13,23 @@ const S = {
   publicChat: "publicChat",
   posHex: "posHex",
   posWild: "posWild",
-  resetPos: "resetPositions"
+  resetPos: "resetPositions",
+  theme: "theme",
+  colorAccent: "colorAccent",
+  colorBackground: "colorBackground",
+  colorText: "colorText",
+  bgOpacity: "bgOpacity"
+};
+
+const THEMES = {
+  gold:      { label: "Gold (default)", accent: "#e0b94a", background: "#16120c", text: "#ece6d8" },
+  silver:    { label: "Silver",         accent: "#c9d1dc", background: "#14171c", text: "#e8ecf1" },
+  crimson:   { label: "Crimson",        accent: "#e0604f", background: "#1c0e0e", text: "#f0e2de" },
+  emerald:   { label: "Emerald",        accent: "#5fc98a", background: "#0e1a14", text: "#e2efe6" },
+  arcane:    { label: "Arcane purple",  accent: "#b18cf0", background: "#150f22", text: "#ebe4f7" },
+  ocean:     { label: "Ocean blue",     accent: "#5ab4e0", background: "#0c161d", text: "#e0edf3" },
+  parchment: { label: "Parchment (light)", accent: "#7a4b12", background: "#efe2c4", text: "#2b2116" },
+  custom:    { label: "Custom (colours below)" }
 };
 
 const DEFAULT_POS = { hex: { left: 120, top: 120 }, wild: { left: 120, top: 70 } };
@@ -43,7 +59,7 @@ Hooks.once("init", () => {
   // Visible world settings
   reg(S.hexMax, {
     name: "Hexes per day",
-    hint: "Number of segments in the hex clock. You can still go past it (forced march); the clock then gets a red ring.",
+    hint: "Number of segments in the hex clock. Clicking past a full clock starts it over at 0.",
     scope: "world", config: true, type: Number, default: 4,
     range: { min: 1, max: 12, step: 1 }, onChange: rerender
   });
@@ -74,6 +90,26 @@ Hooks.once("init", () => {
     hint: "If off, the chat message listing who gained exhaustion is whispered to the GM only.",
     scope: "world", config: true, type: Boolean, default: true
   });
+
+  // Per-browser colours (same presets as the Golarion calendar)
+  const ColorType = foundry.data?.fields?.ColorField ? new foundry.data.fields.ColorField() : String;
+  const themeChange = () => applyTheme();
+  reg(S.theme, {
+    name: "Colour theme",
+    hint: "Colour scheme of the trackers on your screen. Pick Custom to use the three colours below.",
+    scope: "client", config: true, type: String, default: "gold",
+    choices: Object.fromEntries(Object.entries(THEMES).map(([k, v]) => [k, v.label])),
+    onChange: themeChange
+  });
+  reg(S.colorAccent, { name: "Custom accent colour", hint: "Clock segments and highlights (Custom theme).",
+    scope: "client", config: true, type: ColorType, default: "#e0b94a", onChange: themeChange });
+  reg(S.colorBackground, { name: "Custom background colour", hint: "Custom theme.",
+    scope: "client", config: true, type: ColorType, default: "#16120c", onChange: themeChange });
+  reg(S.colorText, { name: "Custom text colour", hint: "Custom theme.",
+    scope: "client", config: true, type: ColorType, default: "#ece6d8", onChange: themeChange });
+  reg(S.bgOpacity, { name: "Background opacity", hint: "Lower = more see-through. Applies to every theme.",
+    scope: "client", config: true, type: Number, default: 0.9,
+    range: { min: 0.2, max: 1, step: 0.05 }, onChange: themeChange });
 
   // Per-browser positions
   reg(S.posHex, { scope: "client", config: false, type: new fields.ObjectField(), default: DEFAULT_POS.hex });
@@ -148,6 +184,7 @@ class Tracker {
   static #create(kind) {
     const el = document.createElement("div");
     el.className = `wt-tracker wt-${kind}`;
+    applyTheme(el);
     const pos = get(this.config(kind).pos);
     el.style.left = `${pos.left}px`;
     el.style.top = `${pos.top}px`;
@@ -165,13 +202,11 @@ class Tracker {
     const value = get(cfg.value);
     const max = get(cfg.max);
     const hidden = game.user.isGM && !get(cfg.players);
-    const over = value > max;
     el.classList.toggle("wt-gm", game.user.isGM);
-    el.classList.toggle("wt-over", over);
     el.innerHTML = `
       <span class="wt-label">
         ${hidden ? `<i class="fa-solid fa-eye-slash"></i>` : ""}
-        <span class="wt-text">${foundry.utils.escapeHTML(get(cfg.label))}${over ? ` (${value})` : ""}</span>
+        <span class="wt-text">${foundry.utils.escapeHTML(get(cfg.label))}</span>
       </span>
       ${clockSVG(Math.min(value, max), max)}`;
   }
@@ -196,26 +231,46 @@ class Tracker {
       el.style.left = `${left}px`;
       el.style.top = `${top}px`;
     };
+    const tile = Number(ev.target.closest("[data-tile]")?.dataset.tile) || null;
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       el.classList.remove("wt-dragging");
       if (dragging) set(this.config(kind).pos, { left: el.offsetLeft, top: el.offsetTop });
-      else if (game.user.isGM) this.#adjust(kind, +1);
+      else if (game.user.isGM) {
+        if (tile) this.#clickTile(kind, tile);
+        else this.#adjust(kind, +1);
+      }
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   }
 
-  static async #adjust(kind, delta) {
+  /** Clicking a tile fills the clock up to it; clicking the last filled tile empties that one. */
+  static #clickTile(kind, tile) {
+    const current = get(this.config(kind).value);
+    return this.#setValue(kind, tile === current ? tile - 1 : tile);
+  }
+
+  static #adjust(kind, delta) {
     const cfg = this.config(kind);
-    const next = Math.max(0, get(cfg.value) + delta);
-    if (kind === "wild" && next >= get(S.wildMax)) {
+    const max = get(cfg.max);
+    let next = get(cfg.value) + delta;
+    if (next < 0) next = 0;
+    if (kind === "hex" && next > max) next = 0; // a full hex clock starts over
+    return this.#setValue(kind, next);
+  }
+
+  static async #setValue(kind, value) {
+    const cfg = this.config(kind);
+    const max = get(cfg.max);
+    value = Math.min(Math.max(0, value), max);
+    if (kind === "wild" && value >= max) {
       const applied = await applyExhaustion();
       if (applied) await set(S.wild, 0);
       return;
     }
-    return set(cfg.value, next);
+    return set(cfg.value, value);
   }
 
   /* ---------- New day ---------- */
@@ -250,24 +305,56 @@ class Tracker {
   }
 }
 
-/** A circular clock split into `max` segments with `value` filled. */
+/** A circular clock split into `max` clickable tiles, the first `value` of them filled. */
 function clockSVG(value, max) {
   const r = 15, c = 16;
-  let filled = "";
-  if (value >= max) filled = `<circle class="wt-on" cx="${c}" cy="${c}" r="${r}"/>`;
-  else if (value > 0) {
-    const a = (value / max) * 2 * Math.PI;
-    const x = c + r * Math.sin(a), y = c - r * Math.cos(a);
-    filled = `<path class="wt-on" d="M${c},${c} L${c},${c - r} A${r},${r} 0 ${a > Math.PI ? 1 : 0} 1 ${x},${y} Z"/>`;
-  }
-  let lines = "";
-  if (max > 1) for (let i = 0; i < max; i++) {
+  const pt = (i) => {
     const a = (i / max) * 2 * Math.PI;
-    lines += `<line x1="${c}" y1="${c}" x2="${c + r * Math.sin(a)}" y2="${c - r * Math.cos(a)}"/>`;
+    return `${(c + r * Math.sin(a)).toFixed(3)},${(c - r * Math.cos(a)).toFixed(3)}`;
+  };
+  let tiles = "";
+  for (let i = 0; i < max; i++) {
+    const cls = `wt-tile ${i < value ? "wt-on" : ""}`;
+    tiles += max === 1
+      ? `<circle class="${cls}" data-tile="1" cx="${c}" cy="${c}" r="${r}"/>`
+      : `<path class="${cls}" data-tile="${i + 1}" d="M${c},${c} L${pt(i)} A${r},${r} 0 0 1 ${pt(i + 1)} Z"/>`;
   }
-  return `<svg class="wt-clock" viewBox="0 0 32 32">
-    <circle class="wt-off" cx="${c}" cy="${c}" r="${r}"/>${filled}${lines}
+  return `<svg class="wt-clock" viewBox="0 0 32 32">${tiles}
     <circle class="wt-ring" cx="${c}" cy="${c}" r="${r}"/></svg>`;
+}
+
+/* -------------------------------------------- */
+/*  Colours                                     */
+/* -------------------------------------------- */
+
+function hexToRgb(hex, fallback) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex ?? "").trim());
+  if (!m) return fallback;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+const rgba = (rgb, a) => `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`;
+
+function applyTheme(el) {
+  const targets = el ? [el] : Object.values(Tracker.els);
+  const key = get(S.theme) ?? "gold";
+  const t = key === "custom"
+    ? { accent: String(get(S.colorAccent)), background: String(get(S.colorBackground)), text: String(get(S.colorText)) }
+    : THEMES[key] ?? THEMES.gold;
+  const accent = hexToRgb(t.accent, [224, 185, 74]);
+  const bg = hexToRgb(t.background, [22, 18, 12]);
+  const text = hexToRgb(t.text, [236, 230, 216]);
+  const opacity = Math.max(0.2, Math.min(1, Number(get(S.bgOpacity)) || 0.9));
+  const vars = {
+    "--wt-accent": rgba(accent, 1),
+    "--wt-accent-hover": rgba(accent, 0.55),
+    "--wt-border": rgba(accent, 0.45),
+    "--wt-bg": rgba(bg, opacity),
+    "--wt-empty": rgba(text, 0.12),
+    "--wt-line": rgba(bg, 1),
+    "--wt-text": rgba(text, 1)
+  };
+  for (const target of targets) for (const [k, v] of Object.entries(vars)) target.style.setProperty(k, v);
 }
 
 /* -------------------------------------------- */

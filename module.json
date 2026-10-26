@@ -2,7 +2,7 @@
   "id": "wilderness-travel",
   "title": "Wilderness Travel Tracker",
   "description": "Tracks hexes travelled per day and days spent in the wilderness, with draggable progress bars, an end-of-day safe haven prompt for the GM and automatic exhaustion after too many days in the wild.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "authors": [{ "name": "Yannic" }],
   "compatibility": {
     "minimum": "13",

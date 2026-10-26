@@ -7,10 +7,10 @@
   height: 32px;
   max-width: 220px;
   padding: 0 3px 0 10px;
-  background: rgba(14, 14, 20, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--wt-bg, rgba(22, 18, 12, 0.9));
+  border: 1px solid var(--wt-border, rgba(224, 185, 74, 0.45));
   border-radius: 6px;
-  color: #e8e4dc;
+  color: var(--wt-text, #ece6d8);
   font-family: var(--font-primary, "Signika"), sans-serif;
   font-size: 14px;
   user-select: none;
@@ -18,23 +18,21 @@
   pointer-events: auto;
 }
 .wt-tracker.wt-gm { cursor: pointer; }
-.wt-tracker:hover { border-color: rgba(255, 255, 255, 0.3); }
 .wt-tracker.wt-dragging { cursor: grabbing; opacity: 0.85; }
 
-.wt-label {
-  display: flex; align-items: center; gap: 6px;
-  min-width: 0; flex: 1;
-}
+.wt-label { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
 .wt-label i { font-size: 12px; opacity: 0.8; }
 .wt-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Clock */
 .wt-clock { flex: 0 0 26px; width: 26px; height: 26px; }
-.wt-clock .wt-off { fill: rgba(255, 255, 255, 0.12); }
-.wt-clock .wt-on { fill: #f2efe8; }
-.wt-clock line { stroke: #0e0e14; stroke-width: 1.4; }
-.wt-clock .wt-ring { fill: none; stroke: #f2efe8; stroke-width: 1.4; }
-.wt-over .wt-clock .wt-ring { stroke: #e0503c; stroke-width: 2.2; }
+.wt-clock .wt-tile {
+  fill: var(--wt-empty, rgba(255, 255, 255, 0.12));
+  stroke: var(--wt-line, #16120c); stroke-width: 1.2; stroke-linejoin: round;
+}
+.wt-clock .wt-tile.wt-on { fill: var(--wt-accent, #e0b94a); }
+.wt-gm .wt-clock .wt-tile:hover { fill: var(--wt-accent-hover, rgba(224, 185, 74, 0.55)); }
+.wt-clock .wt-ring { fill: none; stroke: var(--wt-accent, #e0b94a); stroke-width: 1.4; pointer-events: none; }
 
 /* Exhaustion picker dialog */
 .wt-pick-actions { margin: 4px 0 6px; font-size: 12px; }
